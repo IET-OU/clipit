@@ -36,14 +36,21 @@ class ClipitQuiz extends UBItem{
     /**
      * @var int Id of Taxonomy used as topic for this Quiz (optional)
      */
-    public $taxonomy = -1;
+    public $tricky_topic = 0;
+
+    public $embed_url = "";
+    public $scores_url = "";
+    public $author_name = "";
 
     protected function load_from_elgg($elgg_object){
         parent::load_from_elgg($elgg_object);
         $this->public = (bool)$elgg_object->public;
         $this->question_array = (array)$elgg_object->question_array;
-        $this->taxonomy = (int)$elgg_object->taxonomy;
+        $this->tricky_topic = (int)$elgg_object->tricky_topic;
         $this->target = (string)$elgg_object->target;
+        $this->embed_url = (string) $elgg_object->embed_url;
+        $this->scores_url = (string) $elgg_object->scores_url;
+        $this->author_name = (string) $elgg_object->author_name;
     }
 
     /**
@@ -53,23 +60,11 @@ class ClipitQuiz extends UBItem{
         parent::copy_to_elgg($elgg_object);
         $elgg_object->public = (bool)$this->public;
         $elgg_object->question_array = (array)$this->question_array;
-        $elgg_object->taxonomy = (int)$this->taxonomy;
+        $elgg_object->tricky_topic = (int)$this->tricky_topic;
         $elgg_object->target = (string)$this->target;
-    }
-
-    /**
-     * Set Quiz privacy into "public" property (true = public, false = private)
-     *
-     * @param string $value Flag specifying if the quiz is public or not
-     */
-    function setPrivacy($value){
-        if($value == "true"){
-            $this->public = true;
-        } elseif($value == "false"){
-            $this->public = false;
-        } else{
-            $this->public = (bool)$value;
-        }
+        $elgg_object->embed_url = (string) $this->embed_url;
+        $elgg_object->scores_url = (string) $this->scores_url;
+        $elgg_object->author_name = (string) $this->author_name;
     }
 
     /**
@@ -81,13 +76,16 @@ class ClipitQuiz extends UBItem{
      * @return int|bool Returns Id of Item if correct, or false if error
      */
     static function set_properties($id, $prop_value_array){
-        if(!$item = new static($id)){
-            return false;
-        }
         $new_prop_value_array = array();
         foreach($prop_value_array as $prop => $value){
             if($prop == "public"){
-                $item->setPrivacy($value);
+                if($value == "true"){
+                    $new_prop_value_array["public"] = true;
+                } elseif($value == "false"){
+                    $new_prop_value_array["public"] = false;
+                } else{
+                    $new_prop_value_array["public"] = (bool)$value;
+                }
             } else{
                 $new_prop_value_array[$prop] = $value;
             }

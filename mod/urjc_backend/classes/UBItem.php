@@ -37,6 +37,10 @@ class UBItem{
      */
     public $description = "";
     /**
+     * @var string URL of the instance
+     */
+    public $url = "";
+    /**
      * @var int Unique Id of the owner/creator of this instance
      */
     public $owner_id = 0;
@@ -90,21 +94,23 @@ class UBItem{
     /**
      * @param ElggObject $elgg_object Elgg Object to load parameters from.
      */
-    protected function load_from_elgg($elgg_object){
-        $this->id = (int)$elgg_object->get("guid");
-        $this->name = (string)$elgg_object->get("name");
-        $this->description = (string)$elgg_object->get("description");
-        $this->owner_id = (int)$elgg_object->getOwnerGUID();
-        $this->time_created = (int)$elgg_object->getTimeCreated();
+    protected function load_from_elgg($elgg_entity){
+        $this->id = (int)$elgg_entity->get("guid");
+        $this->name = (string)$elgg_entity->get("name");
+        $this->description = (string)$elgg_entity->get("description");
+        $this->url = (string)$elgg_entity->get("url");
+        $this->owner_id = (int)$elgg_entity->getOwnerGUID();
+        $this->time_created = (int)$elgg_entity->getTimeCreated();
     }
 
     /**
      * @param ElggObject $elgg_object Elgg object instance to save Item to
      */
-    protected function copy_to_elgg($elgg_object){
-        $elgg_object->set("name", (string)$this->name);
-        $elgg_object->set("description", (string)$this->description);
-        $elgg_object->set("access_id", ACCESS_PUBLIC);
+    protected function copy_to_elgg($elgg_entity){
+        $elgg_entity->set("name", (string)$this->name);
+        $elgg_entity->set("description", (string)$this->description);
+        $elgg_entity->set("url", (string)$this->url);
+        $elgg_entity->set("access_id", ACCESS_PUBLIC);
     }
 
     /**
@@ -113,10 +119,10 @@ class UBItem{
      * @return bool True if success, false if error.
      */
     protected function delete(){
-        if(!$elgg_entity = get_Entity((int)$this->id)){
+        if(!$elgg_object = new ElggObject((int)$this->id)){
             return false;
         }
-        return $elgg_entity->delete();
+        return $elgg_object->delete();
     }
 
     /* Static Functions */
@@ -159,18 +165,14 @@ class UBItem{
      * @throws InvalidParameterException
      */
     static function set_properties($id, $prop_value_array){
-        if($id === -1){ //called from 'create' method
-            $item = new static();
-        } elseif(empty($id)){
+        if(!$item = new static($id)){
             return false;
-        }else {
-            if(!$item = new static($id)){
-                return false;
-            }
         }
         foreach($prop_value_array as $prop => $value){
             if(!array_key_exists($prop, self::list_properties())){
-                throw new InvalidParameterException("ERROR: One or more property names do not exist.");
+                if($prop !== "hash"){
+                    throw new InvalidParameterException("ERROR: One or more property names do not exist.");
+                }
             }
             if($prop == "id"){
                 throw new InvalidParameterException("ERROR: Cannot modify 'id' of instance.");
@@ -188,7 +190,7 @@ class UBItem{
      * @return int|bool Returns instance Id if correct, or false if error
      */
     static function create($prop_value_array){
-        return static::set_properties(-1, $prop_value_array);
+        return static::set_properties(null, $prop_value_array);
     }
 
     /**
@@ -200,7 +202,7 @@ class UBItem{
      */
     static function delete_by_id($id_array){
         foreach($id_array as $id){
-            if(!$item = new static($id)){
+            if(!$item = new static((int)$id)){
                 return false;
             }
             if(!$item->delete()){
@@ -229,6 +231,7 @@ class UBItem{
                 $object_array[(int)$elgg_object->guid] = new static((int)$elgg_object->guid);
             }
         }
+        usort($object_array, 'UBItem::sort_by_date_inv');
         return $object_array;
     }
 
@@ -315,6 +318,8 @@ class UBItem{
     }
 
     /**
+     * Sort by Date, oldest to newest.
+     *
      * @param UBItem $i1
      * @param UBItem $i2
      * @return int Returns 0 if equal, -1 if i1 < i2, 1 if i1 > i2.
@@ -327,11 +332,48 @@ class UBItem{
     }
 
     /**
+     * Sort by Date Inverse order, newest to oldest.
+     *
      * @param UBItem $i1
      * @param UBItem $i2
      * @return int Returns 0 if equal, -1 if i1 < i2, 1 if i1 > i2.
      */
+    static function sort_by_date_inv($i1, $i2){
+        if((int)$i1->time_created == (int)$i2->time_created){
+            return 0;
+        }
+        return ((int)$i1->time_created > (int)$i2->time_created) ? -1 : 1;
+    }
+
+    /**
+ * @param UBItem $i1
+ * @param UBItem $i2
+ * @return int Returns 0 if equal, -1 if i1 < i2, 1 if i1 > i2.
+ */
     static function sort_by_name($i1, $i2){
         return strcmp($i1->name, $i2->name);
+    }
+
+    /**
+     * @param UBItem $i1
+     * @param UBItem $i2
+     * @return int Returns 0 if equal, -1 if i1 < i2, 1 if i1 > i2.
+     */
+    static function sort_by_name_inv($i1, $i2){
+        return strcmp($i2->name, $i1->name);
+    }
+
+    static function sort_numbers($n1, $n2){
+        if((int)$n1 == (int)$n2){
+            return 0;
+        }
+        return ((int)$n1 < (int)$n2) ? -1 : 1;
+    }
+
+    static function sort_numbers_inv($n1, $n2){
+        if((int)$n1 == (int)$n2){
+            return 0;
+        }
+        return ((int)$n1 > (int)$n2) ? -1 : 1;
     }
 }

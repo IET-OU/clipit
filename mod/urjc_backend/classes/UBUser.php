@@ -37,8 +37,8 @@ class UBUser extends UBItem{
     public $email = "";
     public $role = "user";
     public $language = "";
-    public $last_login = -1;
-    private $password_hash = "";
+    public $last_login = 0;
+    private $hash = "";
 
     function __construct($id = null){
         if(!empty($id)){
@@ -61,7 +61,7 @@ class UBUser extends UBItem{
         $this->email = (string)$elgg_user->email;
         $this->login = (string)$elgg_user->username;
         $this->password = (string)$elgg_user->password;
-        $this->password_hash = (string)$elgg_user->salt;
+        $this->hash = (string)$elgg_user->salt;
         $this->role = (string)$elgg_user->role;
         $this->language = (string)$elgg_user->language;
         $this->last_login = (int)$elgg_user->last_login;
@@ -84,12 +84,24 @@ class UBUser extends UBItem{
         return $this->id = $elgg_user->guid;
     }
 
+    /**
+     * Deletes an instance from the system.
+     *
+     * @return bool True if success, false if error.
+     */
+    protected function delete(){
+        if(!$elgg_user = new ElggUser((int)$this->id)){
+            return false;
+        }
+        return $elgg_user->delete();
+    }
+
     protected function copy_to_elgg($elgg_user){
         parent::copy_to_elgg($elgg_user);
         $elgg_user->email = $this->email;
         $elgg_user->username = $this->login;
         $elgg_user->password = $this->password;
-        $elgg_user->salt = $this->password_hash;
+        $elgg_user->salt = $this->hash;
         $elgg_user->role = $this->role;
         if($this->language == ""){
             $elgg_user->language = get_language();
@@ -102,17 +114,18 @@ class UBUser extends UBItem{
     /**
      * Creates an encoded user password using a random hash for encoding.
      *
-     * @param string $password The new user password in clear text.
+     * @param string $clear_password The new user password in clear text.
      *
      * @return bool 'true' if success, 'false' if error.
      */
-    protected function setPassword($password){
-        if(!$password){
+    protected static function create_password($clear_password){
+        if(!$clear_password){
             return false;
         }
-        $this->password_hash = generate_random_cleartext_password();
-        $this->password = md5($password . $this->password_hash);
-        return true;
+        $new_password = array();
+        $new_password["hash"] = generate_random_cleartext_password();
+        $new_password["password"] = md5($clear_password . $new_password["hash"]);
+        return $new_password;
     }
 
     /**
@@ -128,15 +141,22 @@ class UBUser extends UBItem{
         if(!$item = new static($id)){
             return false;
         }
-        $new_prop_value_array = array();
         foreach($prop_value_array as $prop => $value){
+            if($prop == "id"){
+                throw new InvalidParameterException("ERROR: Cannot modify 'id' of instance.");
+            }
             if($prop == "password"){
-                $item->setPassword($value); // @todo check for errors
-            } else{
-                $new_prop_value_array[$prop] = $value;
+                $new_password = static::create_password($value);
+                $item->password = $new_password["password"];
+                $item->hash = $new_password["hash"];
+                continue;
+            } if(!array_key_exists($prop, self::list_properties())){
+                throw new InvalidParameterException("ERROR: One or more property names do not exist.");
+            }else{
+                $item->$prop = $value;
             }
         }
-        return parent::set_properties($id, $new_prop_value_array);
+        return $item->save();
     }
 
     /**
